@@ -1,56 +1,42 @@
-⚡ NO REGRET_OS
-High-Performance Life Management System
-NO REGRET is a specialized productivity OS built with Flutter. It moves away from "soft" habit tracking and focuses on Mission-Critical task execution, deep focus sessions, and AI-driven performance auditing.
+⚡ NO REGRET: Neural Command & Performance
+NO REGRET is a ruthless, terminal-style productivity engine designed to eliminate procrastination through AI-enforced accountability, deep work tracking, and schedule auditing.
 
-🛠 TECHNICAL STACK
+"The Gatekeeper does not accept excuses. Only output."
+
+🛠 Tech Stack
 Framework: Flutter (Material 3)
 
-Persistence: Hive (NoSQL Key-Value store for high-speed local data)
+Intelligence: Google Gemini 1.5 Flash (AI Core)
 
-Intelligence: Google Gemini AI (Neural Link for performance auditing)
+Persistence: Shared Preferences & Custom Store Architecture
 
-State Management: Reactive ValueListenable architecture
+Authentication: Google OAuth2 (for Calendar Sync)
 
-Aesthetics: Dual-Mode UI (Mission Mode / Ghost Mode)
+UI Aesthetic: Tactical Dark / Ghost Mode (Monospace)
 
-🧬 CORE ARCHITECTURE
-1. The Boot Sequence (QuoteScreen)
-The app starts with a high-intensity "Boot Sequence" that pulls daily wisdom from the QuoteStore. The ENGAGE PROTOCOL button initiates the system using heavy haptic feedback.
+🚀 Core Systems
+1. Neural Command (AI Screen)
+A direct link to the Gatekeeper AI.
 
-2. Operational Hub (DashboardScreen)
-The landing zone for daily execution.
+AUDIT: Analyzes your current tasks and calendar events to see if you are actually "moving the needle."
 
-Displays Momentum Score and active mission status.
+STRATEGIZE: Generates 90-minute deep work blocks based on real-time task data.
 
-Direct access to high-priority objectives.
+ROAST: A zero-tolerance protocol that shames procrastination and low focus time.
 
-3. Tactical Planning (TimetableScreen)
-A visual time-blocking interface.
+2. The Gatekeeper Protocol (Focus Enforcement)
+Unlike standard timers, sessions in No Regret are protected.
 
-Color-coded "Heatmap" representation of daily intensity.
+Active Recall Enforcement: At the end of a focus session, the AI generates a high-difficulty conceptual question.
 
-Cross-references scheduled blocks with actual task completion.
+Pass/Fail Logic: You must demonstrate understanding to successfully log the session. If you fail, the focus time is discarded.
 
-4. Performance Analytics (StatsScreen)
-The "After-Action Report" (AAR).
+3. Google Calendar Sync
+The AI reads your primary calendar to integrate your meetings into your daily strategy. It knows when you are busy and when you are making excuses.
 
-XP System: Calculates experience points based on session duration and focus intensity.
+4. Ghost Mode
+A stealth UI toggle that transforms the app into a terminal interface.
 
-Momentum Log: A 7-day vertical bar chart and yearly heatmap grid.
+Palette: Tactical Gray and Stealth Black.
 
-Ranking System: Progresses from Initiate Monk to Elite Operator.
-
-🛡 UNIQUE FEATURES
-🌑 GHOST MODE
-A system-wide override triggered by a Long Press on the Header.
-
-UI Shift: Transitions from Tactical Orange to Clinical Grey (#637381).
-
-Typography: Swaps 'Inter' for 'Courier' (Monospace) for a terminal-inspired feel.
-
-Psychology: Designed to reduce visual stimulation during high-stress focus periods.
-
-🧠 NEURAL LINK (AI Audit)
-Integrated AI screen that analyzes your tasksBox and sessionsBox.
-
-Command: /audit — The AI reviews your last 24 hours and provides a brutally honest efficiency report.
+Typography: Monospace font for zero-distraction execution.
