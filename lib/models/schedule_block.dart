@@ -15,6 +15,27 @@ class ScheduleBlock {
     this.isCompleted = false,
   });
 
+  // --- NEW: Serialization ---
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'startMinutes': startMinutes,
+      'endMinutes': endMinutes,
+      'isCompleted': isCompleted,
+    };
+  }
+
+  factory ScheduleBlock.fromMap(Map<String, dynamic> map) {
+    return ScheduleBlock(
+      id: map['id'],
+      title: map['title'],
+      startMinutes: map['startMinutes'],
+      endMinutes: map['endMinutes'],
+      isCompleted: map['isCompleted'] ?? false,
+    );
+  }
+
   TimeOfDay get start =>
       TimeOfDay(hour: startMinutes ~/ 60, minute: startMinutes % 60);
 
@@ -26,11 +47,9 @@ class ScheduleBlock {
   double get progress {
     final now = TimeOfDay.now();
     final current = now.hour * 60 + now.minute;
-
     if (current < startMinutes) return 0.0;
     if (current >= endMinutes) return 1.0;
     if (duration <= 0) return 0.0;
-
     return (current - startMinutes) / duration;
   }
 

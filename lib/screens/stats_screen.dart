@@ -4,6 +4,7 @@ import '../core/session_store.dart';
 import '../core/streak_store.dart';
 import '../core/time_utils.dart';
 import '../main.dart';
+import '../core/stats_utils.dart' as stats_utils;
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -23,7 +24,7 @@ class _StatsScreenState extends State<StatsScreen> {
     });
   }
 
-  // ✅ TOTAL XP
+  // ✅ TOTAL XP: Aggregates from ALL historical sessions
   int _calculateTotalXP() {
     final sessions = SessionStore.sessions;
     if (sessions.isEmpty) return 0;
@@ -34,8 +35,9 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  // ✅ RANK
+  // ✅ RANK LOGIC
   String _getRankTitle(int xp) {
+    if (xp > 10000) return "UNSTOPPABLE ENTITY";
     if (xp > 5000) return "WAR ROOM LEGEND";
     if (xp > 2000) return "DEEP KNIGHT";
     if (xp > 500) return "FOCUS SQUIRE";
@@ -49,65 +51,19 @@ class _StatsScreenState extends State<StatsScreen> {
     return (xp / 500).clamp(0.0, 1.0);
   }
 
-  // ✅ 7 DAY DATA
-  Map<DateTime, int> _getDailyMomentum() {
-    final Map<DateTime, int> momentum = {};
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    for (int i = 0; i < 7; i++) {
-      final date = today.subtract(Duration(days: i));
-      momentum[date] = 0;
-    }
-
-    final sessions = SessionStore.sessions;
-
-    for (var session in sessions) {
-      final date = DateTime(
-        session.start.year,
-        session.start.month,
-        session.start.day,
-      );
-
-      if (momentum.containsKey(date)) {
-        momentum[date] = (momentum[date] ?? 0) + session.durationSeconds;
-      }
-    }
-
-    return momentum;
-  }
-
-  void _resetAllData(Color activeColor) async {
+  void _resetAllData() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111111),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "RESET DATA?",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          "This will erase all sessions and tasks.",
-          style: TextStyle(color: Colors.white60),
-        ),
+        title: const Text("PURGE ALL DATA?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text("This action is irreversible. All history will be lost.", style: TextStyle(color: Colors.white60)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              "CANCEL",
-              style: TextStyle(color: Colors.white38),
-            ),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCEL", style: TextStyle(color: Colors.white38))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              "ERASE",
-              style: TextStyle(
-                color: Colors.redAccent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Text("ERASE", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -133,7 +89,8 @@ class _StatsScreenState extends State<StatsScreen> {
         return ValueListenableBuilder(
           valueListenable: TaskStore.tick,
           builder: (context, _, __) {
-            final dailyTotals = _getDailyMomentum();
+            // Using the optimized historical focus helper
+            final dailyTotals = stats_utils.getLast7DaysFocus();
             final sortedDates = dailyTotals.keys.toList()..sort();
 
             final totalXP = _calculateTotalXP();
@@ -146,7 +103,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 title: GestureDetector(
-                  onLongPress: () => _resetAllData(activeColor),
+                  onLongPress: _resetAllData,
                   child: Text(
                     "PERFORMANCE",
                     style: TextStyle(
@@ -159,10 +116,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 ),
                 centerTitle: true,
                 leading: IconButton(
-                  icon: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                  ),
+                  icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -173,14 +127,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   Center(
                     child: Column(
                       children: [
-                        Text(
-                          rankTitle,
-                          style: TextStyle(
-                            color: activeColor,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 22,
-                          ),
-                        ),
+                        Text(rankTitle, style: TextStyle(color: activeColor, fontWeight: FontWeight.w900, fontSize: 22)),
                         const SizedBox(height: 12),
                         LinearProgressIndicator(
                           value: rankProgress,
@@ -191,11 +138,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         const SizedBox(height: 8),
                         Text(
                           "$totalXP TOTAL XP",
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 10,
-                            letterSpacing: 2,
-                          ),
+                          style: const TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 2),
                         ),
                       ],
                     ),
@@ -203,34 +146,23 @@ class _StatsScreenState extends State<StatsScreen> {
 
                   const SizedBox(height: 40),
 
-                  // 📊 7 Day Chart
+                  // 📊 7 Day Momentum Chart (Time Focus)
                   const Text(
-                    "LAST 7 DAYS",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    "MOMENTUM (LAST 7 DAYS)",
+                    style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
 
                   ...sortedDates.map((date) {
                     final seconds = dailyTotals[date] ?? 0;
-
+                    
+                    // Determine scale based on max activity to make chart relative
                     final maxSeconds = dailyTotals.values.every((v) => v == 0)
-                        ? 3600
+                        ? 3600 
                         : dailyTotals.values.reduce((a, b) => a > b ? a : b);
 
                     final ratio = (seconds / maxSeconds).clamp(0.0, 1.0);
-
-                    final dayLabel = [
-                      "Mon",
-                      "Tue",
-                      "Wed",
-                      "Thu",
-                      "Fri",
-                      "Sat",
-                      "Sun",
-                    ][date.weekday - 1];
+                    final dayLabel = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][date.weekday - 1];
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -238,10 +170,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         children: [
                           SizedBox(
                             width: 35,
-                            child: Text(
-                              dayLabel,
-                              style: const TextStyle(color: Colors.white38),
-                            ),
+                            child: Text(dayLabel, style: const TextStyle(color: Colors.white38)),
                           ),
                           Expanded(
                             child: Container(
@@ -255,7 +184,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                 widthFactor: ratio,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: activeColor,
+                                    color: ratio > 0.8 ? activeColor : activeColor.withOpacity(0.7),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                 ),
@@ -268,10 +197,7 @@ class _StatsScreenState extends State<StatsScreen> {
                             child: Text(
                               formatTotalTime(seconds),
                               textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                color: Colors.white24,
-                                fontSize: 11,
-                              ),
+                              style: const TextStyle(color: Colors.white24, fontSize: 11),
                             ),
                           ),
                         ],

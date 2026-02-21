@@ -9,8 +9,24 @@ class Session {
     this.distractions = 0,
   });
 
-  DateTime get end => start.add(Duration(seconds: durationSeconds));
+  // --- NEW: Serialization ---
+  Map<String, dynamic> toMap() {
+    return {
+      'start': start.toIso8601String(),
+      'durationSeconds': durationSeconds,
+      'distractions': distractions,
+    };
+  }
 
+  factory Session.fromMap(Map<String, dynamic> map) {
+    return Session(
+      start: DateTime.parse(map['start']),
+      durationSeconds: map['durationSeconds'] ?? 0,
+      distractions: map['distractions'] ?? 0,
+    );
+  }
+
+  DateTime get end => start.add(Duration(seconds: durationSeconds));
   int get durationMinutes => (durationSeconds / 60).ceil();
 
   String get formattedDuration {

@@ -26,26 +26,52 @@ class Task {
   })  : createdDate = createdDate ?? DateTime.now(),
         completionHistory = completionHistory ?? [];
 
-  bool get isDoneOrSkipped => isCompleted || isSkipped || isFinished;
-
-  String get formattedTime {
-    final minutes = (timeSpentInSeconds % 3600) ~/ 60;
-    final seconds = timeSpentInSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  bool get isHighQualitySession => timeSpentInSeconds >= 1500;
-
-  bool get wasCreatedToday {
-    final now = DateTime.now();
-    return createdDate.year == now.year &&
-        createdDate.month == now.month &&
-        createdDate.day == now.day;
-  }
-
+  // FIXED: Corrected createdAt to createdDate
   bool get isFromYesterday {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return createdDate.isBefore(today);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    return createdDate.year == yesterday.year &&
+           createdDate.month == yesterday.month &&
+           createdDate.day == yesterday.day;
   }
+
+  // --- Serialization ---
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'createdDate': createdDate.toIso8601String(),
+      'isCompleted': isCompleted,
+      'isSkipped': isSkipped,
+      'isDaily': isDaily,
+      'focusEnabled': focusEnabled,
+      'timeSpentInSeconds': timeSpentInSeconds,
+      'isRunning': isRunning,
+      'isFinished': isFinished,
+      'completionHistory': completionHistory,
+    };
+  }
+
+  factory Task.fromMap(Map<String, dynamic> map) {
+    return Task(
+      id: map['id'] ?? '',
+      title: map['title'] ?? 'Untitled',
+      createdDate: map['createdDate'] != null 
+          ? DateTime.parse(map['createdDate']) 
+          : DateTime.now(),
+      isCompleted: map['isCompleted'] ?? false,
+      isSkipped: map['isSkipped'] ?? false,
+      isDaily: map['isDaily'] ?? false,
+      focusEnabled: map['focusEnabled'] ?? false,
+      timeSpentInSeconds: map['timeSpentInSeconds'] ?? 0,
+      isRunning: map['isRunning'] ?? false,
+      isFinished: map['isFinished'] ?? false,
+      completionHistory: map['completionHistory'] != null 
+          ? List<String>.from(map['completionHistory']) 
+          : [],
+    );
+  }
+
+  bool get isDoneOrSkipped => isCompleted || isSkipped || isFinished;
 }

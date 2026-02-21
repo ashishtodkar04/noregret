@@ -10,20 +10,19 @@ class Quote {
   });
 
   int get wordCount => text.split(' ').length;
-
   String get displayAuthor => author.isEmpty ? "Unknown" : "- $author";
-
   int get typingDurationMs => (wordCount * 150).clamp(1000, 5000);
 
-  Quote copyWith({
-    String? text,
-    String? author,
-    DateTime? createdAt,
-  }) {
-    return Quote(
-      text: text ?? this.text,
-      author: author ?? this.author,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
+  // For persistence if needed later
+  Map<String, dynamic> toMap() => {
+    'text': text,
+    'author': author,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory Quote.fromMap(Map<String, dynamic> map) => Quote(
+    text: map['text'],
+    author: map['author'],
+    createdAt: DateTime.parse(map['createdAt']),
+  );
 }

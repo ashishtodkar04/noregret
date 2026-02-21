@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart'; // NEW: 2026 Standard for auto-timezone
 import 'schedule_store.dart';
 
 class NotificationService {
@@ -10,22 +11,28 @@ class NotificationService {
   static Future<void> init() async {
     tz.initializeTimeZones();
 
-    // Fallback logic without external package
+    // AUTO-DETECT Timezone (No more hardcoding Asia/Kolkata)
     try {
-      tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+      final String timeZoneName = await FlutterTimezone.getLocalTimezone().toString();
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
     } catch (e) {
+      debugPrint("TZ Error: Falling back to UTC. $e");
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      ),
     );
 
     await _notifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (details) {
-        // Handle notification click here if needed
+        // Trigger logic when user taps the "Mission Prepare" notification
       },
     );
 
@@ -33,21 +40,19 @@ class NotificationService {
   }
 
   static Future<void> _requestPermissions() async {
-    final androidImplementation = _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-
-    if (androidImplementation != null) {
-      // Permission for Android 13+
-      await androidImplementation.requestNotificationsPermission();
-      // Permission for Exact Alarms (Crucial for scheduled reminders)
-      await androidImplementation.requestExactAlarmsPermission();
+    // Android 13+ Notification Permission
+    final android = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (android != null) {
+      await android.requestNotificationsPermission();
+      // Required for 2026 Android versions to prevent "Alarm silences"
+      await android.requestExactAlarmsPermission();
     }
   }
 
   static Future<void> scheduleScheduleReminders() async {
-    // Prevent duplicate schedules
+    // 1. Clear previous schedules to prevent "notification ghosting"
     await _notifications.cancelAll();
 
     final blocks = ScheduleStore.todayBlocks;
@@ -56,7 +61,7 @@ class NotificationService {
     for (int i = 0; i < blocks.length; i++) {
       final block = blocks[i];
 
-      // Calculate start time: today at block's hour/min, minus 5 mins
+      // 2. Tactical Logic: 5 mins before start
       final scheduledDateTime = DateTime(
         now.year,
         now.month,
@@ -65,26 +70,30 @@ class NotificationService {
         block.start.minute,
       ).subtract(const Duration(minutes: 5));
 
-      // Only schedule if the time hasn't passed yet
+      // 3. Only schedule if the window is still open
       if (scheduledDateTime.isAfter(now)) {
         final tzScheduledTime = tz.TZDateTime.from(scheduledDateTime, tz.local);
 
         await _notifications.zonedSchedule(
           i,
-          'NEXT MISSION: ${block.title.toUpperCase()}',
-          'Initiating in 5 minutes. Prepare for deep work.',
+          'MISSION STARTING: ${block.title.toUpperCase()}',
+          'Deep work initiates in 5 minutes. Clear your terminal.',
           tzScheduledTime,
-          NotificationDetails(
+          const NotificationDetails(
             android: AndroidNotificationDetails(
-              'schedule_channel',
+              'schedule_channel_v2',
               'Tactical Reminders',
-              channelDescription: 'Timetable block transitions',
+              channelDescription: 'High-priority transition alerts',
               importance: Importance.max,
               priority: Priority.high,
-              color: Colors.orange, // UI visual color in notification bar
-              styleInformation: BigTextStyleInformation(
-                '',
-              ), // For longer titles
+              color: Colors.orange,
+              // Enables the "Big Text" style for impact
+              styleInformation: BigTextStyleInformation(''),
+            ),
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
             ),
           ),
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -98,13 +107,14 @@ class NotificationService {
   static Future<void> sendInactivityNudge() async {
     await _notifications.show(
       999,
-      'STATUS CHECK',
-      'No mission progress detected today. Re-engage immediately.',
+      'SYSTEM AUDIT',
+      'No focus detected. Your future self is losing ground. Act now.',
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'nudge_channel',
           'System Nudges',
-          importance: Importance.defaultImportance,
+          importance: Importance.high,
+          priority: Priority.high,
           color: Colors.orange,
         ),
       ),

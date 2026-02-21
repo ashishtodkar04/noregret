@@ -11,11 +11,7 @@ class TaskCard extends StatefulWidget {
   final Task task;
   final VoidCallback onToggle;
 
-  const TaskCard({
-    super.key,
-    required this.task,
-    required this.onToggle,
-  });
+  const TaskCard({super.key, required this.task, required this.onToggle});
 
   @override
   State<TaskCard> createState() => _TaskCardState();
@@ -24,6 +20,7 @@ class TaskCard extends StatefulWidget {
 class _TaskCardState extends State<TaskCard> {
   Timer? _timer;
   int _sessionStartSeconds = 0;
+  int _ticksSinceLastSave = 0; // Performance optimizer
 
   @override
   void initState() {
@@ -48,10 +45,17 @@ class _TaskCardState extends State<TaskCard> {
 
       setState(() {
         widget.task.timeSpentInSeconds++;
+        _ticksSinceLastSave++;
       });
 
-      TaskStore.update(widget.task);
-      StreakStore.updateForToday();
+      // UI update only
+      TaskStore.notify();
+
+      // SAVE TO DISK every 30 seconds to prevent lag
+      if (_ticksSinceLastSave >= 30) {
+        TaskStore.update(widget.task);
+        _ticksSinceLastSave = 0;
+      }
     });
   }
 
@@ -70,6 +74,7 @@ class _TaskCardState extends State<TaskCard> {
 
     _timer?.cancel();
     _timer = null;
+    _ticksSinceLastSave = 0;
 
     setState(() {
       widget.task.isRunning = false;
@@ -79,7 +84,9 @@ class _TaskCardState extends State<TaskCard> {
         widget.task.timeSpentInSeconds - _sessionStartSeconds;
 
     if (sessionSeconds > 0) {
-      SessionStore.addSession(sessionSeconds);
+      SessionStore.addSession(sessionSeconds, taskTitle: widget.task.title);
+      // NOTE: We don't record activity for the streak here,
+      // we do it when the task is actually CHECKED as completed.
     }
 
     TaskStore.update(widget.task);
@@ -115,14 +122,13 @@ class _TaskCardState extends State<TaskCard> {
                       color: Colors.orange.withOpacity(0.2),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
-                    )
+                    ),
                   ]
                 : [],
           ),
           child: Card(
             elevation: task.isRunning ? 4 : 0,
-            color:
-                task.isRunning ? Colors.grey[900] : Colors.black12,
+            color: task.isRunning ? Colors.grey[900] : Colors.black12,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
@@ -134,38 +140,45 @@ class _TaskCardState extends State<TaskCard> {
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
+                horizontal: 16,
+                vertical: 8,
+              ),
               leading: Checkbox(
                 activeColor: Colors.orange,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4)),
+                  borderRadius: BorderRadius.circular(4),
+                ),
                 value: task.isCompleted,
                 onChanged: task.isSkipped
                     ? null
                     : (val) {
-                        setState(() {
-                          task.isCompleted = val ?? false;
+                        if (task.isRunning) _stopTimer();
 
-                          if (task.isCompleted) {
-                            _stopTimer();
-                            HapticFeedback.mediumImpact();
-                          } else {
-                            HapticFeedback.selectionClick();
-                          }
-                        });
+                        // Use the store method to ensure history & streaks are updated
+                        TaskStore.toggleTaskCompletion(task.id);
 
-                        TaskStore.update(task);
+                        if (val == true) {
+                          HapticFeedback.mediumImpact();
+                          StreakStore.recordActivity(); // Valid activity recorded
+                        } else {
+                          HapticFeedback.selectionClick();
+                        }
+
+                        // Call parent callback if needed
+                        widget.onToggle();
                       },
               ),
               title: Text(
                 task.title,
                 style: TextStyle(
+                  color: Colors.white,
                   fontWeight: task.isRunning
                       ? FontWeight.bold
                       : FontWeight.normal,
                   decoration: task.isCompleted
                       ? TextDecoration.lineThrough
                       : null,
+                  decorationColor: Colors.orange,
                 ),
               ),
               subtitle: Row(
@@ -173,16 +186,14 @@ class _TaskCardState extends State<TaskCard> {
                   Text(
                     _formatTime(task.timeSpentInSeconds),
                     style: TextStyle(
-                      color: task.isRunning
-                          ? Colors.orange
-                          : Colors.white38,
+                      color: task.isRunning ? Colors.orange : Colors.white38,
                       fontSize: 12,
                     ),
                   ),
                   if (task.isRunning) ...[
                     const SizedBox(width: 8),
                     const _PulseDot(),
-                  ]
+                  ],
                 ],
               ),
               trailing: IconButton(
@@ -192,30 +203,24 @@ class _TaskCardState extends State<TaskCard> {
                       : Icons.play_circle_fill,
                   color: task.isSkipped
                       ? Colors.white10
-                      : (task.isRunning
-                          ? Colors.orange
-                          : Colors.white70),
+                      : (task.isRunning ? Colors.orange : Colors.white70),
                   size: 32,
                 ),
-                onPressed:
-                    (task.isSkipped || task.isCompleted)
-                        ? null
-                        : () {
-                            if (task.focusEnabled) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      FocusScreen(task: task),
-                                ),
-                              );
-                            } else {
-                              task.isRunning
-                                  ? _stopTimer()
-                                  : _startTimer();
-                              HapticFeedback.lightImpact();
-                            }
-                          },
+                onPressed: (task.isSkipped || task.isCompleted)
+                    ? null
+                    : () {
+                        if (task.focusEnabled) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FocusScreen(task: task),
+                            ),
+                          );
+                        } else {
+                          task.isRunning ? _stopTimer() : _startTimer();
+                          HapticFeedback.lightImpact();
+                        }
+                      },
               ),
             ),
           ),
@@ -225,6 +230,7 @@ class _TaskCardState extends State<TaskCard> {
   }
 }
 
+// _PulseDot code remains the same as your previous snippet...
 class _PulseDot extends StatefulWidget {
   const _PulseDot();
 
@@ -255,11 +261,7 @@ class _PulseDotState extends State<_PulseDot>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _controller,
-      child: const Icon(
-        Icons.circle,
-        size: 6,
-        color: Colors.orange,
-      ),
+      child: const Icon(Icons.circle, size: 6, color: Colors.orange),
     );
   }
 }

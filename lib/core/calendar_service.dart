@@ -1,11 +1,13 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart';
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/task_model.dart';
 import 'task_store.dart';
 
 class CalendarService {
   static final _googleSignIn = GoogleSignIn(
+    // Ensure this Client ID matches your google-services.json precisely
     clientId: "589119281976-649h3tvpg9jfvjd3j0eel77k0vthci01.apps.googleusercontent.com",
     scopes: [
       CalendarApi.calendarReadonlyScope,
@@ -15,36 +17,30 @@ class CalendarService {
 
   static Future<void> syncGoogleTasks() async {
     if (!TaskStore.isInitialized) {
-      print("Calendar Sync: TaskStore not initialized.");
+      debugPrint("SYSTEM: Sync blocked. TaskStore offline.");
       return;
     }
 
     try {
-      // 1. Silent sign-in attempt first, then full sign-in
+      // 1. Authenticate
       GoogleSignInAccount? user = await _googleSignIn.signInSilently();
       user ??= await _googleSignIn.signIn();
       
       if (user == null) {
-        print("Calendar Sync: User cancelled login.");
+        debugPrint("AUTH: Sync aborted by user.");
         return;
       }
 
-      // 2. Get the authenticated HTTP client
+      // 2. Initialize API
       final httpClient = await _googleSignIn.authenticatedClient();
-      if (httpClient == null) {
-        print("Calendar Sync: Failed to get authenticated client.");
-        return;
-      }
+      if (httpClient == null) return;
 
       final calendarApi = CalendarApi(httpClient);
       
-      // 3. Define Time Range (Local Today)
-      // We fetch from start of today 00:00 to end of today 23:59
+      // 3. Define Today's Window (00:00 to 23:59)
       final now = DateTime.now();
       final startOfToday = DateTime(now.year, now.month, now.day, 0, 0, 0);
       final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
-      print("Syncing events from ${startOfToday.toIso8601String()}");
 
       final events = await calendarApi.events.list(
         "primary",
@@ -54,53 +50,52 @@ class CalendarService {
         orderBy: 'startTime',
       );
 
-      if (events.items != null && events.items!.isNotEmpty) {
+      if (events.items != null) {
         int addedCount = 0;
         for (var event in events.items!) {
-          bool added = _convertToLocalTask(event);
-          if (added) addedCount++;
+          if (_processEvent(event)) addedCount++;
         }
-        print("Calendar Sync: Added $addedCount new events.");
         
-        // Notify the UI listeners
-        TaskStore.notify();
-      } else {
-        print("Calendar Sync: No events found for today.");
+        if (addedCount > 0) {
+          debugPrint("SYNC: Integrated $addedCount events.");
+          TaskStore.notify(); // Refresh UI
+        }
       }
     } catch (e) {
-      print("Calendar Sync Error: $e");
+      debugPrint("CALENDAR ERROR: $e");
+      // PRO TIP: In 2026, if you get 'ApiException 10', 
+      // check your SHA-1 fingerprint in Firebase/Google Cloud.
       rethrow;
     }
   }
 
-  /// Converts a Google Event to a local Task. 
-  /// Returns true if added, false if it already existed.
-  static bool _convertToLocalTask(Event event) {
+  static bool _processEvent(Event event) {
     final String googleId = event.id ?? "";
-    final String summary = event.summary ?? 'Untitled Event';
+    final String summary = event.summary ?? 'Untitled Mission';
     if (googleId.isEmpty) return false;
 
-    // Duplicate Check: Look for ID or the specific Calendar Title format
+    // Check if task already exists (by ID or exact Title match)
     final bool exists = TaskStore.tasks.any(
       (t) => t.id == googleId || t.title == "📅 $summary",
     );
 
     if (exists) return false;
 
-    // Create the mission
+    // Inject as a new Task
     final newTask = Task(
       id: googleId,
       title: "📅 $summary",
       isDaily: false, 
-      // We set createdDate to exactly NOW so it passes the 'wasCreatedToday' UI filter
-      createdDate: DateTime.now(),
+      createdDate: DateTime.now(), // Pass current day filter
       completionHistory: [],
-      timeSpentInSeconds: 0,
     );
 
     TaskStore.addTask(newTask);
     return true;
   }
 
-  static Future<void> logout() => _googleSignIn.signOut();
+  static Future<void> logout() async {
+    await _googleSignIn.signOut();
+    debugPrint("AUTH: Logged out of Google.");
+  }
 }
