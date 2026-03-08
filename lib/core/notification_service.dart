@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:flutter_timezone/flutter_timezone.dart'; // NEW: 2026 Standard for auto-timezone
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'schedule_store.dart';
 
 class NotificationService {
-  static final _notifications = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
+  // ---------------- INIT ----------------
 
   static Future<void> init() async {
     tz.initializeTimeZones();
 
-    // AUTO-DETECT Timezone (No more hardcoding Asia/Kolkata)
     try {
-      final String timeZoneName = await FlutterTimezone.getLocalTimezone().toString();
-      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+
+      tz.setLocalLocation(tz.getLocation(timezoneInfo.toString()));
     } catch (e) {
       debugPrint("TZ Error: Falling back to UTC. $e");
       tz.setLocalLocation(tz.getLocation('UTC'));
@@ -29,39 +32,72 @@ class NotificationService {
       ),
     );
 
-    await _notifications.initialize(
-      settings,
-      onDidReceiveNotificationResponse: (details) {
-        // Trigger logic when user taps the "Mission Prepare" notification
-      },
-    );
+    await _notifications.initialize(settings);
+
+    await _createChannels();
 
     await _requestPermissions();
   }
 
+  // ---------------- CHANNELS ----------------
+
+  static Future<void> _createChannels() async {
+    const AndroidNotificationChannel scheduleChannel =
+        AndroidNotificationChannel(
+          'schedule_channel_v2',
+          'Tactical Reminders',
+          description: 'High priority schedule alerts',
+          importance: Importance.max,
+        );
+
+    const AndroidNotificationChannel nudgeChannel = AndroidNotificationChannel(
+      'nudge_channel',
+      'System Nudges',
+      description: 'Productivity nudges',
+      importance: Importance.high,
+    );
+
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    if (android != null) {
+      await android.createNotificationChannel(scheduleChannel);
+      await android.createNotificationChannel(nudgeChannel);
+    }
+  }
+
+  // ---------------- PERMISSIONS ----------------
+
   static Future<void> _requestPermissions() async {
-    // Android 13+ Notification Permission
-    final android = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (android != null) {
       await android.requestNotificationsPermission();
-      // Required for 2026 Android versions to prevent "Alarm silences"
+
       await android.requestExactAlarmsPermission();
     }
   }
 
+  // ---------------- SCHEDULE REMINDERS ----------------
+
   static Future<void> scheduleScheduleReminders() async {
-    // 1. Clear previous schedules to prevent "notification ghosting"
-    await _notifications.cancelAll();
+    // Cancel only schedule notifications
+    for (int i = 0; i < 100; i++) {
+      await _notifications.cancel(i);
+    }
 
     final blocks = ScheduleStore.todayBlocks;
+
     final now = DateTime.now();
 
     for (int i = 0; i < blocks.length; i++) {
       final block = blocks[i];
 
-      // 2. Tactical Logic: 5 mins before start
       final scheduledDateTime = DateTime(
         now.year,
         now.month,
@@ -70,7 +106,6 @@ class NotificationService {
         block.start.minute,
       ).subtract(const Duration(minutes: 5));
 
-      // 3. Only schedule if the window is still open
       if (scheduledDateTime.isAfter(now)) {
         final tzScheduledTime = tz.TZDateTime.from(scheduledDateTime, tz.local);
 
@@ -87,7 +122,6 @@ class NotificationService {
               importance: Importance.max,
               priority: Priority.high,
               color: Colors.orange,
-              // Enables the "Big Text" style for impact
               styleInformation: BigTextStyleInformation(''),
             ),
             iOS: DarwinNotificationDetails(
@@ -103,6 +137,8 @@ class NotificationService {
       }
     }
   }
+
+  // ---------------- INACTIVITY NUDGE ----------------
 
   static Future<void> sendInactivityNudge() async {
     await _notifications.show(

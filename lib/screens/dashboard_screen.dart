@@ -109,10 +109,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .toList();
 
             // Filter: Active Missions for Today
+            final todayKey =
+                "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+
             final todayTasks = TaskStore.todayAndCalendarTasks.where((t) {
               if (t.isCompleted) {
-                final todayKey =
-                    "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
                 return t.completionHistory.contains(todayKey);
               }
               return true;
@@ -284,7 +285,8 @@ class _OverviewHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final dateKey = "${now.year}-${now.month}-${now.day}";
+    final dateKey =
+        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
     final Color activeColor = Theme.of(context).primaryColor;
 
     final doneToday = allTasks

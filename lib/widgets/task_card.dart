@@ -18,78 +18,53 @@ class TaskCard extends StatefulWidget {
 }
 
 class _TaskCardState extends State<TaskCard> {
-  Timer? _timer;
-  int _sessionStartSeconds = 0;
-  int _ticksSinceLastSave = 0; // Performance optimizer
+  Timer? _uiTimer;
 
   @override
   void initState() {
     super.initState();
+
     if (widget.task.isRunning) {
-      _resumeTimer();
+      _startUITimer();
     }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _uiTimer?.cancel();
     super.dispose();
   }
 
-  void _resumeTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
+  void _startUITimer() {
+    _uiTimer?.cancel();
 
-      setState(() {
-        widget.task.timeSpentInSeconds++;
-        _ticksSinceLastSave++;
-      });
-
-      // UI update only
-      TaskStore.notify();
-
-      // SAVE TO DISK every 30 seconds to prevent lag
-      if (_ticksSinceLastSave >= 30) {
-        TaskStore.update(widget.task);
-        _ticksSinceLastSave = 0;
-      }
+    _uiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
     });
   }
 
   void _startTimer() {
-    if (_timer != null) return;
-
-    _sessionStartSeconds = widget.task.timeSpentInSeconds;
-    widget.task.isRunning = true;
-
-    TaskStore.update(widget.task);
-    _resumeTimer();
+    TaskStore.startTask(widget.task.id);
+    _startUITimer();
+    HapticFeedback.lightImpact();
   }
 
   void _stopTimer() {
-    if (_timer == null) return;
+    TaskStore.stopTask(widget.task.id);
+    _uiTimer?.cancel();
+    _uiTimer = null;
+    HapticFeedback.lightImpact();
+  }
 
-    _timer?.cancel();
-    _timer = null;
-    _ticksSinceLastSave = 0;
-
-    setState(() {
-      widget.task.isRunning = false;
-    });
-
-    final sessionSeconds =
-        widget.task.timeSpentInSeconds - _sessionStartSeconds;
-
-    if (sessionSeconds > 0) {
-      SessionStore.addSession(sessionSeconds, taskTitle: widget.task.title);
-      // NOTE: We don't record activity for the streak here,
-      // we do it when the task is actually CHECKED as completed.
+  int _getLiveSeconds(Task task) {
+    if (!task.isRunning || task.startedAt == null) {
+      return task.timeSpentInSeconds;
     }
 
-    TaskStore.update(widget.task);
+    final diff = DateTime.now().difference(task.startedAt!).inSeconds;
+
+    return task.timeSpentInSeconds + diff;
   }
 
   String _formatTime(int seconds) {
@@ -98,12 +73,16 @@ class _TaskCardState extends State<TaskCard> {
     final s = seconds % 60;
 
     if (h > 0) return '${h}h ${m}m';
+
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
+
+    final liveSeconds = _getLiveSeconds(task);
+
     final isInactive = task.isCompleted || task.isSkipped;
 
     return AnimatedScale(
@@ -143,6 +122,8 @@ class _TaskCardState extends State<TaskCard> {
                 horizontal: 16,
                 vertical: 8,
               ),
+
+              /// ✅ FIXED CHECKBOX
               leading: Checkbox(
                 activeColor: Colors.orange,
                 shape: RoundedRectangleBorder(
@@ -154,20 +135,18 @@ class _TaskCardState extends State<TaskCard> {
                     : (val) {
                         if (task.isRunning) _stopTimer();
 
-                        // Use the store method to ensure history & streaks are updated
-                        TaskStore.toggleTaskCompletion(task.id);
+                        /// Only call parent toggle
+                        widget.onToggle();
 
                         if (val == true) {
                           HapticFeedback.mediumImpact();
-                          StreakStore.recordActivity(); // Valid activity recorded
+                          StreakStore.recordActivity();
                         } else {
                           HapticFeedback.selectionClick();
                         }
-
-                        // Call parent callback if needed
-                        widget.onToggle();
                       },
               ),
+
               title: Text(
                 task.title,
                 style: TextStyle(
@@ -181,10 +160,11 @@ class _TaskCardState extends State<TaskCard> {
                   decorationColor: Colors.orange,
                 ),
               ),
+
               subtitle: Row(
                 children: [
                   Text(
-                    _formatTime(task.timeSpentInSeconds),
+                    _formatTime(liveSeconds),
                     style: TextStyle(
                       color: task.isRunning ? Colors.orange : Colors.white38,
                       fontSize: 12,
@@ -196,6 +176,8 @@ class _TaskCardState extends State<TaskCard> {
                   ],
                 ],
               ),
+
+              /// ▶ / ⏸ PLAY PAUSE BUTTON
               trailing: IconButton(
                 icon: Icon(
                   task.isRunning
@@ -218,7 +200,6 @@ class _TaskCardState extends State<TaskCard> {
                           );
                         } else {
                           task.isRunning ? _stopTimer() : _startTimer();
-                          HapticFeedback.lightImpact();
                         }
                       },
               ),
@@ -230,7 +211,6 @@ class _TaskCardState extends State<TaskCard> {
   }
 }
 
-// _PulseDot code remains the same as your previous snippet...
 class _PulseDot extends StatefulWidget {
   const _PulseDot();
 
@@ -245,6 +225,7 @@ class _PulseDotState extends State<_PulseDot>
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),

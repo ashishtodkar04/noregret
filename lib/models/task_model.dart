@@ -2,19 +2,28 @@ class Task {
   String id;
   String title;
   DateTime createdDate;
+
   bool isCompleted;
   bool isSkipped;
   bool isDaily;
+
   bool focusEnabled;
+
   int timeSpentInSeconds;
+
   bool isRunning;
   bool isFinished;
+
+  /// NEW: used to calculate elapsed time when screen is off
+  DateTime? startedAt;
+
   List<String> completionHistory;
 
   Task({
     required this.id,
     required this.title,
     DateTime? createdDate,
+    this.startedAt,
     this.isCompleted = false,
     this.isSkipped = false,
     this.isDaily = false,
@@ -23,19 +32,34 @@ class Task {
     this.isRunning = false,
     this.isFinished = false,
     List<String>? completionHistory,
-  })  : createdDate = createdDate ?? DateTime.now(),
-        completionHistory = completionHistory ?? [];
+  }) : createdDate = createdDate ?? DateTime.now(),
+       completionHistory = completionHistory ?? [];
 
-  // FIXED: Corrected createdAt to createdDate
+  // ---------------- DATE HELPERS ----------------
+
   bool get isFromYesterday {
     final now = DateTime.now();
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final yesterday = now.subtract(const Duration(days: 1));
+
     return createdDate.year == yesterday.year &&
-           createdDate.month == yesterday.month &&
-           createdDate.day == yesterday.day;
+        createdDate.month == yesterday.month &&
+        createdDate.day == yesterday.day;
   }
 
-  // --- Serialization ---
+  bool get isDoneOrSkipped {
+    return isCompleted || isSkipped || isFinished;
+  }
+  void markFinished() {
+  isCompleted = true;
+  isFinished = true;
+  isRunning = false;
+  startedAt = null;
+}
+void undoFinished() {
+  isCompleted = false;
+  isFinished = false;
+}
+  // ---------------- SERIALIZATION ----------------
 
   Map<String, dynamic> toMap() {
     return {
@@ -49,6 +73,7 @@ class Task {
       'timeSpentInSeconds': timeSpentInSeconds,
       'isRunning': isRunning,
       'isFinished': isFinished,
+      'startedAt': startedAt?.toIso8601String(),
       'completionHistory': completionHistory,
     };
   }
@@ -57,8 +82,8 @@ class Task {
     return Task(
       id: map['id'] ?? '',
       title: map['title'] ?? 'Untitled',
-      createdDate: map['createdDate'] != null 
-          ? DateTime.parse(map['createdDate']) 
+      createdDate: map['createdDate'] != null
+          ? DateTime.parse(map['createdDate'])
           : DateTime.now(),
       isCompleted: map['isCompleted'] ?? false,
       isSkipped: map['isSkipped'] ?? false,
@@ -67,11 +92,12 @@ class Task {
       timeSpentInSeconds: map['timeSpentInSeconds'] ?? 0,
       isRunning: map['isRunning'] ?? false,
       isFinished: map['isFinished'] ?? false,
-      completionHistory: map['completionHistory'] != null 
-          ? List<String>.from(map['completionHistory']) 
+      startedAt: map['startedAt'] != null
+          ? DateTime.parse(map['startedAt'])
+          : null,
+      completionHistory: map['completionHistory'] != null
+          ? List<String>.from(map['completionHistory'])
           : [],
     );
   }
-
-  bool get isDoneOrSkipped => isCompleted || isSkipped || isFinished;
 }

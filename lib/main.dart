@@ -13,18 +13,14 @@ import 'core/session_store.dart';
 import 'core/schedule_store.dart';
 
 void main() async {
-  // 1. Mandatory for storage and notifications
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // 2. BOOT SEQUENCE: Load all data from disk BEFORE showing UI
     await _initServices();
-    
-    // 3. LOGIC REFRESH: Handle daily resets
-    // Note: StreakStore.init() now handles its own "Broken Streak" check 
-    // internally, so we don't call updateForToday() here to avoid false increments.
+
+    // Refresh tasks for today
     TaskStore.refreshForToday();
-    
+
     debugPrint("SYSTEM: All systems nominal. Launching UI.");
   } catch (e) {
     debugPrint("BOOT FATAL ERROR: $e");
@@ -33,12 +29,9 @@ void main() async {
   runApp(const NoRegretApp());
 }
 
-/// Initializes all persistent stores in parallel for faster startup
 Future<void> _initServices() async {
-  // Initialize AppSettings first to determine the theme immediately
   await appSettings.init();
-  
-  // Initialize all storage stores 
+
   await Future.wait([
     TaskStore.init(),
     SessionStore.init(),
@@ -47,11 +40,14 @@ Future<void> _initServices() async {
     QuoteStore.init(),
     NotificationService.init(),
   ]);
-  
+
+  // 🔔 Schedule today's reminders
+  await NotificationService.scheduleScheduleReminders();
+
   debugPrint("SYSTEM: Persistent Storage Online.");
 }
 
-// --- PERSISTED APP SETTINGS ---
+// ---------------- SETTINGS ----------------
 
 class AppSettings extends ChangeNotifier {
   bool ghostMode = false;
@@ -64,19 +60,52 @@ class AppSettings extends ChangeNotifier {
 
   void toggleGhostMode() async {
     ghostMode = !ghostMode;
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('ghost_mode_active', ghostMode);
+
     notifyListeners();
   }
 }
 
-// Global instance for the app to listen to
 final AppSettings appSettings = AppSettings();
 
-// --- ROOT APPLICATION ---
+// ---------------- APP ----------------
 
-class NoRegretApp extends StatelessWidget {
+class NoRegretApp extends StatefulWidget {
   const NoRegretApp({super.key});
+
+  @override
+  State<NoRegretApp> createState() => _NoRegretAppState();
+}
+
+class _NoRegretAppState extends State<NoRegretApp> with WidgetsBindingObserver {
+  DateTime lastCheck = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Detect when the app resumes (new day check)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final now = DateTime.now();
+
+      if (!_isSameDay(now, lastCheck)) {
+        TaskStore.refreshForToday();
+        debugPrint("SYSTEM: New Day Detected → Tasks Refreshed");
+      }
+
+      lastCheck = now;
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,10 +113,10 @@ class NoRegretApp extends StatelessWidget {
       animation: appSettings,
       builder: (context, _) {
         final bool isGhostMode = appSettings.ghostMode;
-        
-        // UI Customization: Tactical Orange or Stealth Gray
-        final Color activeColor =
-            isGhostMode ? const Color(0xFF637381) : Colors.orange;
+
+        final Color activeColor = isGhostMode
+            ? const Color(0xFF637381)
+            : Colors.orange;
 
         return MaterialApp(
           debugShowCheckedModeBanner: false,
@@ -97,10 +126,9 @@ class NoRegretApp extends StatelessWidget {
             brightness: Brightness.dark,
             scaffoldBackgroundColor: Colors.black,
             primaryColor: activeColor,
-            
-            // Switches to a terminal-style font for Ghost Mode
-            fontFamily: isGhostMode ? 'monospace' : 'Inter', 
-            
+
+            fontFamily: isGhostMode ? 'monospace' : 'Inter',
+
             colorScheme: ColorScheme.dark(
               primary: activeColor,
               secondary: activeColor.withOpacity(0.7),
@@ -108,7 +136,6 @@ class NoRegretApp extends StatelessWidget {
               onSurface: isGhostMode ? activeColor : Colors.white,
             ),
 
-            // Tactical styling for App Bar
             appBarTheme: AppBarTheme(
               backgroundColor: Colors.black,
               elevation: 0,
@@ -121,7 +148,6 @@ class NoRegretApp extends StatelessWidget {
               ),
             ),
 
-            // Dark thematic cards
             cardTheme: CardThemeData(
               color: const Color(0xFF0D0D0D),
               elevation: 0,

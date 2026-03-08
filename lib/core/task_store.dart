@@ -7,33 +7,41 @@ class TaskStore {
   static bool _initialized = false;
   static bool get isInitialized => _initialized;
 
-  // Internal storage using a Map for O(1) lookups
   static final Map<String, Task> _storage = {};
 
-  /// Global notifier to refresh Dashboard, Stats, and Widgets
   static final ValueNotifier<int> tick = ValueNotifier(0);
 
-  // --- PERSISTENCE ENGINE ---
+  // ---------------- DATE HELPER ----------------
 
-  /// Resets daily tasks if they haven't been completed for the current date
-  static void refreshForToday() {
+  static String _todayKey() {
     final now = DateTime.now();
-    final todayKey = "${now.year}-${now.month}-${now.day}";
+    final y = now.year;
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return "$y-$m-$d";
+  }
 
+  // ---------------- DAILY REFRESH ----------------
+
+  static void refreshForToday() {
+    final todayKey = _todayKey();
     bool changed = false;
-    // Corrected: Use _storage.values instead of _tasks list
+
     for (var task in _storage.values) {
-      if (task.isDaily) {
-        bool completedInHistory = task.completionHistory.contains(todayKey);
-        
-        if (completedInHistory && !task.isCompleted) {
-          task.isCompleted = true;
-          changed = true;
-        } else if (!completedInHistory && task.isCompleted) {
-          task.isCompleted = false;
-          task.isRunning = false;
-          changed = true;
-        }
+      if (!task.isDaily) continue;
+
+      bool completedToday = task.completionHistory.contains(todayKey);
+
+      if (completedToday && !task.isCompleted) {
+        task.isCompleted = true;
+        changed = true;
+      }
+
+      if (!completedToday && task.isCompleted) {
+        task.isCompleted = false;
+        task.isRunning = false;
+        task.startedAt = null;
+        changed = true;
       }
     }
 
@@ -43,7 +51,8 @@ class TaskStore {
     }
   }
 
-  /// Initialize and load data from disk.
+  // ---------------- INIT ----------------
+
   static Future<void> init() async {
     if (_initialized) return;
 
@@ -53,11 +62,14 @@ class TaskStore {
 
       if (jsonString != null) {
         final Map<String, dynamic> decoded = json.decode(jsonString);
-        _storage.clear(); 
+
+        _storage.clear();
+
         decoded.forEach((key, value) {
           _storage[key] = Task.fromMap(value);
         });
       }
+
       debugPrint("TaskStore: Loaded ${_storage.length} tasks.");
     } catch (e) {
       debugPrint("TaskStore Load Error: $e");
@@ -67,21 +79,25 @@ class TaskStore {
     notify();
   }
 
-  /// Saves current state to physical storage.
+  // ---------------- SAVE ----------------
+
   static Future<void> _persist() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
       final Map<String, dynamic> toEncode = {};
+
       _storage.forEach((key, task) {
         toEncode[key] = task.toMap();
       });
+
       await prefs.setString('noregret_tasks_v1', json.encode(toEncode));
     } catch (e) {
       debugPrint("TaskStore Save Error: $e");
     }
   }
 
-  // --- GETTERS ---
+  // ---------------- GETTERS ----------------
 
   static List<Task> get tasks =>
       _storage.values.toList()
@@ -89,37 +105,48 @@ class TaskStore {
 
   static List<Task> get todayAndCalendarTasks {
     final now = DateTime.now();
+
     return tasks.where((t) {
       if (t.isDaily) return true;
+
+      if (t.title.startsWith("📅")) return true;
+
       if (t.createdDate.year == now.year &&
           t.createdDate.month == now.month &&
-          t.createdDate.day == now.day)
+          t.createdDate.day == now.day) {
         return true;
-      if (t.title.startsWith("📅")) return true;
+      }
+
       return false;
     }).toList();
   }
 
   static int get pendingTaskCount => tasks.where((t) => !t.isCompleted).length;
 
-  // --- CORE LOGIC ---
+  // ---------------- CORE LOGIC ----------------
 
   static void toggleTaskCompletion(String id, {String? customDateKey}) {
     final task = _storage[id];
     if (task == null) return;
 
-    final now = DateTime.now();
-    final todayKey = "${now.year}-${now.month}-${now.day}";
+    final todayKey = _todayKey();
     final dateKey = customDateKey ?? todayKey;
 
     if (task.completionHistory.contains(dateKey)) {
+      // undo completion
       task.completionHistory.remove(dateKey);
-      if (dateKey == todayKey) task.isCompleted = false;
+
+      if (dateKey == todayKey) {
+        task.isCompleted = false;
+      }
     } else {
+      // mark completed
       task.completionHistory.add(dateKey);
+
       if (dateKey == todayKey) {
         task.isCompleted = true;
         task.isRunning = false;
+        task.startedAt = null;
       }
     }
 
@@ -131,16 +158,18 @@ class TaskStore {
     final Task? task = taskOrId is String
         ? _storage[taskOrId]
         : (taskOrId is Task ? taskOrId : null);
+
     if (task == null) return;
 
-    final now = DateTime.now();
-    final todayKey = "${now.year}-${now.month}-${now.day}";
+    final todayKey = _todayKey();
 
     if (!task.completionHistory.contains(todayKey)) {
       task.completionHistory.add(todayKey);
     }
+
     task.isCompleted = true;
     task.isRunning = false;
+    task.startedAt = null;
 
     _persist();
     notify();
@@ -148,52 +177,82 @@ class TaskStore {
 
   static void addTask(Task task) {
     _storage[task.id] = task;
+
     _persist();
     notify();
   }
 
   static void delete(String id) {
     _storage.remove(id);
+
     _persist();
     notify();
   }
 
   static void update(Task task) {
     _storage[task.id] = task;
+
     _persist();
     notify();
   }
 
   static void clearGoogleTasks() {
     _storage.removeWhere((key, t) => t.title.startsWith("📅"));
+
     _persist();
     notify();
   }
 
   static void updateTimeSpent(String id, int seconds) {
     final task = _storage[id];
+
     if (task != null) {
       task.timeSpentInSeconds = seconds;
+
+      _persist();
       notify();
     }
   }
 
+  // ---------------- TIMER ENGINE ----------------
+
   static void startTask(String id) {
+    final now = DateTime.now();
+
     for (final task in _storage.values) {
-      task.isRunning = (task.id == id);
+      if (task.id == id) {
+        task.isRunning = true;
+        task.startedAt = now;
+      } else {
+        task.isRunning = false;
+        task.startedAt = null;
+      }
     }
+
     _persist();
     notify();
   }
 
   static void stopTask(String id) {
     final task = _storage[id];
-    if (task != null && task.isRunning) {
-      task.isRunning = false;
-      _persist();
-      notify();
+
+    if (task == null || !task.isRunning) return;
+
+    final now = DateTime.now();
+
+    if (task.startedAt != null) {
+      final seconds = now.difference(task.startedAt!).inSeconds;
+      task.timeSpentInSeconds += seconds;
     }
+
+    task.startedAt = null;
+    task.isRunning = false;
+
+    _persist();
+    notify();
   }
+
+  // ---------------- UI UPDATE ----------------
 
   static void notify() {
     tick.value++;
