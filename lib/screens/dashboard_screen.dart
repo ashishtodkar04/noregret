@@ -100,165 +100,178 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return ValueListenableBuilder(
           valueListenable: TaskStore.tick,
           builder: (context, _, __) {
-            final List<Task> allTasks = TaskStore.tasks;
-            final int totalXP = _calculateTotalXP();
+            return ValueListenableBuilder(
+              valueListenable: SessionStore.tick,
+              builder: (context, _, __) {
+                final List<Task> allTasks = TaskStore.tasks;
+                final int totalXP = _calculateTotalXP();
 
-            // Filter: Yesterday's Unfinished Tasks
-            final yesterdayUnfinished = allTasks
-                .where((t) => !t.isCompleted && !t.isDaily && t.isFromYesterday)
-                .toList();
-
-            // Filter: Active Missions for Today
-            final todayKey =
-                "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
-
-            final todayTasks = TaskStore.todayAndCalendarTasks.where((t) {
-              if (t.isCompleted) {
-                return t.completionHistory.contains(todayKey);
-              }
-              return true;
-            }).toList();
-
-            final bool isLocked = yesterdayUnfinished.isNotEmpty;
-
-            return Scaffold(
-              backgroundColor: Colors.black,
-              appBar: AppBar(
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "NO REGRET",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    Text(
-                      _getRankTitle(totalXP),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: activeColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  if (_isSyncing)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
+                // Filter: Yesterday's Unfinished Tasks
+                final yesterdayUnfinished = allTasks
+                    .where(
+                      (t) => !t.isCompleted && !t.isDaily && t.isFromYesterday,
                     )
-                  else
-                    IconButton(
-                      icon: Icon(Icons.sync_rounded, color: activeColor),
-                      onPressed: _handleSync,
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.insights_rounded),
-                    onPressed: () => _navTo(const StatsScreen()),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.person_outline_rounded),
-                    onPressed: () => _navTo(const ProfileScreen()),
-                  ),
-                ],
-              ),
-              body: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
-                ),
-                children: [
-                  _OverviewHeader(
-                    allTasks: allTasks,
-                    totalXP: totalXP,
-                    rankProgress: _getRankProgress(totalXP),
-                    isGhostMode: isGhost,
-                  ),
-                  const _StreakBanner(),
+                    .toList();
 
-                  if (isLocked) ...[
-                    _SectionHeader(
-                      title: "YESTERDAY'S DEBT",
-                      trailing: "RESOLVE TO UNLOCK",
-                      icon: Icons.history_toggle_off_rounded,
-                      color: activeColor,
+                // Filter: Active Missions for Today
+                final todayKey =
+                    "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+
+                final todayTasks = TaskStore.todayAndCalendarTasks.where((t) {
+                  if (t.isCompleted) {
+                    return t.completionHistory.contains(todayKey);
+                  }
+                  return true;
+                }).toList();
+
+                final bool isLocked = yesterdayUnfinished.isNotEmpty;
+
+                return Scaffold(
+                  backgroundColor: Colors.black,
+                  appBar: AppBar(
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "NO REGRET",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        Text(
+                          _getRankTitle(totalXP),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: activeColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    ...yesterdayUnfinished.map(
-                      (t) => TaskCard(
-                        task: t,
-                        onToggle: () => TaskStore.toggleTaskCompletion(t.id),
+                    actions: [
+                      if (_isSyncing)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else
+                        IconButton(
+                          icon: Icon(Icons.sync_rounded, color: activeColor),
+                          onPressed: _handleSync,
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.insights_rounded),
+                        onPressed: () => _navTo(const StatsScreen()),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  _SectionHeader(
-                    title: "TODAY'S MISSION",
-                    icon: isLocked
-                        ? Icons.lock_outline_rounded
-                        : Icons.flash_on_rounded,
-                    trailing: isLocked
-                        ? "LOCKED"
-                        : "${todayTasks.length} ACTIVE",
-                    color: activeColor,
+                      IconButton(
+                        icon: const Icon(Icons.person_outline_rounded),
+                        onPressed: () => _navTo(const ProfileScreen()),
+                      ),
+                    ],
                   ),
-                  const DailyQuoteCard(),
-                  const SizedBox(height: 16),
+                  body: ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    children: [
+                      _OverviewHeader(
+                        allTasks: allTasks,
+                        totalXP: totalXP,
+                        rankProgress: _getRankProgress(totalXP),
+                        isGhostMode: isGhost,
+                      ),
+                      const _StreakBanner(),
 
-                  if (!isLocked && todayTasks.isEmpty)
-                    const _EmptyState()
-                  else
-                    ...todayTasks.map(
-                      (t) => Opacity(
-                        opacity: isLocked ? 0.3 : 1.0,
-                        child: IgnorePointer(
-                          ignoring: isLocked,
-                          child: TaskCard(
+                      if (isLocked) ...[
+                        _SectionHeader(
+                          title: "YESTERDAY'S DEBT",
+                          trailing: "RESOLVE TO UNLOCK",
+                          icon: Icons.history_toggle_off_rounded,
+                          color: activeColor,
+                        ),
+                        ...yesterdayUnfinished.map(
+                          (t) => TaskCard(
                             task: t,
                             onToggle: () =>
                                 TaskStore.toggleTaskCompletion(t.id),
                           ),
                         ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      _SectionHeader(
+                        title: "TODAY'S MISSION",
+                        icon: isLocked
+                            ? Icons.lock_outline_rounded
+                            : Icons.flash_on_rounded,
+                        trailing: isLocked
+                            ? "LOCKED"
+                            : "${todayTasks.length} ACTIVE",
+                        color: activeColor,
                       ),
-                    ),
-                  const SizedBox(height: 140),
-                ],
-              ),
-              floatingActionButton: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  FloatingActionButton(
-                    heroTag: "ai_btn",
-                    backgroundColor: activeColor,
-                    mini: true,
-                    onPressed: () => _navTo(const AIScreen()),
-                    child: const Icon(Icons.bolt_rounded, color: Colors.black),
+                      const DailyQuoteCard(),
+                      const SizedBox(height: 16),
+
+                      if (!isLocked && todayTasks.isEmpty)
+                        const _EmptyState()
+                      else
+                        ...todayTasks.map(
+                          (t) => Opacity(
+                            opacity: isLocked ? 0.3 : 1.0,
+                            child: IgnorePointer(
+                              ignoring: isLocked,
+                              child: TaskCard(
+                                task: t,
+                                onToggle: () =>
+                                    TaskStore.toggleTaskCompletion(t.id),
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 140),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  FloatingActionButton.extended(
-                    onPressed: isLocked
-                        ? null
-                        : () => _navTo(const AddTaskScreen()),
-                    backgroundColor: isLocked
-                        ? const Color(0xFF1A1A1A)
-                        : activeColor,
-                    label: Text(
-                      isLocked ? "DEBT DETECTED" : "NEW MISSION",
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    icon: Icon(
-                      isLocked ? Icons.lock_clock_rounded : Icons.add_rounded,
-                    ),
+                  floatingActionButton: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      FloatingActionButton(
+                        heroTag: "ai_btn",
+                        backgroundColor: activeColor,
+                        mini: true,
+                        onPressed: () => _navTo(const AIScreen()),
+                        child: const Icon(
+                          Icons.bolt_rounded,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FloatingActionButton.extended(
+                        onPressed: isLocked
+                            ? null
+                            : () => _navTo(const AddTaskScreen()),
+                        backgroundColor: isLocked
+                            ? const Color(0xFF1A1A1A)
+                            : activeColor,
+                        label: Text(
+                          isLocked ? "DEBT DETECTED" : "NEW MISSION",
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        icon: Icon(
+                          isLocked
+                              ? Icons.lock_clock_rounded
+                              : Icons.add_rounded,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           },
         );

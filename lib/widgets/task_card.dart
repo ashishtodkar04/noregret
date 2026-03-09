@@ -51,9 +51,20 @@ class _TaskCardState extends State<TaskCard> {
   }
 
   void _stopTimer() {
-    TaskStore.stopTask(widget.task.id);
+    final task = widget.task;
+
+    // Stop timer and update task stored time
+    TaskStore.stopTask(task.id);
+
+    final seconds = task.timeSpentInSeconds;
+
+    if (seconds > 0) {
+      SessionStore.addSession(seconds, taskTitle: task.title);
+    }
+
     _uiTimer?.cancel();
     _uiTimer = null;
+
     HapticFeedback.lightImpact();
   }
 

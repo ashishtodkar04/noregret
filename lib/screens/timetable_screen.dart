@@ -52,6 +52,9 @@ class _TimetableScreenState extends State<TimetableScreen> {
       body: ValueListenableBuilder(
         valueListenable: ScheduleStore.tick,
         builder: (context, _, __) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollToToday();
+          });
           final current = ScheduleStore.currentBlock();
           final blocks = ScheduleStore.todayBlocks;
 
@@ -70,7 +73,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 child: SingleChildScrollView(
                   controller: _horizontalController,
                   scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
                   child: Row(
                     children: List.generate(
                       daysInMonth,
@@ -165,7 +167,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
   Widget _buildDayHeader(int day, Color activeColor) {
     bool isToday = day == DateTime.now().day;
     return Container(
-      width: 32,
+      width: 34,
       alignment: Alignment.center,
       child: Text(
         day.toString().padLeft(2, '0'),
@@ -191,15 +193,13 @@ class _TimetableScreenState extends State<TimetableScreen> {
   void _scrollToToday() {
     final today = DateTime.now().day;
 
-    const cellWidth = 32.0;
+    const cellWidth = 34.0;
 
-    final offset = (today - 5) * cellWidth;
+    final screenWidth = MediaQuery.of(context).size.width;
 
-    _horizontalController.animateTo(
-      offset < 0 ? 0 : offset,
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeOut,
-    );
+    final offset = (today * cellWidth) - (screenWidth / 2);
+
+    _horizontalController.jumpTo(offset < 0 ? 0 : offset);
   }
 
   void _handleToggle(String title, int day) {

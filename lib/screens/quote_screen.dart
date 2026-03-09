@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'home_screen.dart';
+import 'main_navigation.dart';
 
 class QuoteScreen extends StatefulWidget {
   const QuoteScreen({super.key});
@@ -26,7 +26,7 @@ class _QuoteScreenState extends State<QuoteScreen> {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const HomeScreen(),
+        pageBuilder: (_, __, ___) => const MainNavigation(),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 800),
@@ -36,8 +36,9 @@ class _QuoteScreenState extends State<QuoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color activeColor =
-        _isGhostMode ? const Color(0xFF637381) : Colors.orange;
+    final Color activeColor = _isGhostMode
+        ? const Color(0xFF637381)
+        : Colors.orange;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -56,17 +57,14 @@ class _QuoteScreenState extends State<QuoteScreen> {
                     : "SYSTEM_INITIALIZED // ${DateTime.now().year}",
                 style: TextStyle(
                   color: activeColor,
-                  fontFamily:
-                      _isGhostMode ? 'monospace' : null,
+                  fontFamily: _isGhostMode ? 'monospace' : null,
                   fontSize: 10,
                   letterSpacing: 2,
                 ),
               ),
               const Spacer(),
               Icon(
-                _isGhostMode
-                    ? Icons.terminal_rounded
-                    : Icons.radar,
+                _isGhostMode ? Icons.terminal_rounded : Icons.radar,
                 color: activeColor,
                 size: 32,
               ),
@@ -102,12 +100,10 @@ class _QuoteScreenState extends State<QuoteScreen> {
                 height: 64,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                        color: activeColor, width: 2),
+                    side: BorderSide(color: activeColor, width: 2),
                     foregroundColor: activeColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                   onPressed: _handleEngage,
@@ -115,19 +111,15 @@ class _QuoteScreenState extends State<QuoteScreen> {
                       ? SizedBox(
                           height: 20,
                           width: 20,
-                          child:
-                              CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             color: activeColor,
                             strokeWidth: 2,
                           ),
                         )
                       : Text(
-                          _isGhostMode
-                              ? "ACCESS_TERMINAL"
-                              : "ENGAGE PROTOCOL",
+                          _isGhostMode ? "ACCESS_TERMINAL" : "ENGAGE PROTOCOL",
                           style: const TextStyle(
-                            fontWeight:
-                                FontWeight.w900,
+                            fontWeight: FontWeight.w900,
                             letterSpacing: 3,
                             fontSize: 13,
                           ),

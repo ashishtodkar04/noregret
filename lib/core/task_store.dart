@@ -51,6 +51,10 @@ class TaskStore {
     }
   }
 
+  static void clearAll() {
+    _storage.clear();
+    notify();
+  }
   // ---------------- INIT ----------------
 
   static Future<void> init() async {

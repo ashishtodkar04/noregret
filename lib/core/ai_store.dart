@@ -4,7 +4,7 @@ import 'task_store.dart';
 import 'streak_store.dart';
 
 class AIStore {
-  static const _apiKey = '';
+  static const _apiKey = 'AIzaSyCPPjzZ4IZjKHUg9K8z6gkycdckY7nppvk';
   static const bool isDevMode = false; 
   static const _modelName = 'gemini-2.5-flash'; 
 
